@@ -7,6 +7,10 @@
       "RelativeMoniker": "D:0:0:{F7E11032-986C-3F47-9960-B45D725D475F}|Intermediate\\ProjectFiles\\MyProject.vcxproj|solutionrelative:Source\\MyProject\\MLPComponent.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
     },
     {
+      "AbsoluteMoniker": "D:0:0:{F7E11032-986C-3F47-9960-B45D725D475F}|Intermediate\\ProjectFiles\\MyProject.vcxproj|C:\\CoursGTech\\B3\\GestionDeProjetCours\\NeuralNetworkUnreal\\MyProject\\Source\\MyProject\\MyProject.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
+      "RelativeMoniker": "D:0:0:{F7E11032-986C-3F47-9960-B45D725D475F}|Intermediate\\ProjectFiles\\MyProject.vcxproj|solutionrelative:Source\\MyProject\\MyProject.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
+    },
+    {
       "AbsoluteMoniker": "D:0:0:{F7E11032-986C-3F47-9960-B45D725D475F}|Intermediate\\ProjectFiles\\MyProject.vcxproj|C:\\CoursGTech\\B3\\GestionDeProjetCours\\NeuralNetworkUnreal\\MyProject\\Source\\MyProject\\MLPComponent.h||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
       "RelativeMoniker": "D:0:0:{F7E11032-986C-3F47-9960-B45D725D475F}|Intermediate\\ProjectFiles\\MyProject.vcxproj|solutionrelative:Source\\MyProject\\MLPComponent.h||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
     }
@@ -34,12 +38,12 @@
               "RelativeToolTip": "Source\\MyProject\\MLPComponent.cpp",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000677|",
-              "WhenOpened": "2026-11-23T10:28:28.52Z",
+              "WhenOpened": "2026-11-23T10:31:20.435Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 1,
+              "DocumentIndex": 2,
               "Title": "MLPComponent.h",
               "DocumentMoniker": "C:\\CoursGTech\\B3\\GestionDeProjetCours\\NeuralNetworkUnreal\\MyProject\\Source\\MyProject\\MLPComponent.h",
               "RelativeDocumentMoniker": "Source\\MyProject\\MLPComponent.h",
@@ -47,8 +51,19 @@
               "RelativeToolTip": "Source\\MyProject\\MLPComponent.h",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000680|",
-              "WhenOpened": "2026-11-23T10:28:28.238Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-11-23T10:31:20.448Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "MyProject.cpp",
+              "DocumentMoniker": "C:\\CoursGTech\\B3\\GestionDeProjetCours\\NeuralNetworkUnreal\\MyProject\\Source\\MyProject\\MyProject.cpp",
+              "RelativeDocumentMoniker": "Source\\MyProject\\MyProject.cpp",
+              "ToolTip": "C:\\CoursGTech\\B3\\GestionDeProjetCours\\NeuralNetworkUnreal\\MyProject\\Source\\MyProject\\MyProject.cpp",
+              "RelativeToolTip": "Source\\MyProject\\MyProject.cpp",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000677|",
+              "WhenOpened": "2026-11-23T10:31:20.452Z"
             }
           ]
         }

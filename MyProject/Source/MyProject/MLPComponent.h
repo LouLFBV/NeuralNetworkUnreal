@@ -6,6 +6,7 @@
 #include "Components/ActorComponent.h"
 #include "MLPComponent.generated.h"
 
+class UTextureRendererTarget2D;
 
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
 class MYPROJECT_API UMLPComponent : public UActorComponent
