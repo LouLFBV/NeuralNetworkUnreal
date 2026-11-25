@@ -11,6 +11,14 @@
       "RelativeMoniker": "D:0:0:{F7E11032-986C-3F47-9960-B45D725D475F}|Intermediate\\ProjectFiles\\MyProject.vcxproj|solutionrelative:Source\\MyProject\\MLPComponent.h||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
     },
     {
+      "AbsoluteMoniker": "D:0:0:{F7E11032-986C-3F47-9960-B45D725D475F}|Intermediate\\ProjectFiles\\MyProject.vcxproj|C:\\CoursGTech\\B3\\GestionDeProjetCours\\NeuralNetworkUnreal\\MyProject\\Source\\MyProject\\Variant_Shooter\\ShooterCharacter.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
+      "RelativeMoniker": "D:0:0:{F7E11032-986C-3F47-9960-B45D725D475F}|Intermediate\\ProjectFiles\\MyProject.vcxproj|solutionrelative:Source\\MyProject\\Variant_Shooter\\ShooterCharacter.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{F7E11032-986C-3F47-9960-B45D725D475F}|Intermediate\\ProjectFiles\\MyProject.vcxproj|C:\\CoursGTech\\B3\\GestionDeProjetCours\\NeuralNetworkUnreal\\MyProject\\Source\\MyProject\\Variant_Shooter\\ShooterCharacter.h||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
+      "RelativeMoniker": "D:0:0:{F7E11032-986C-3F47-9960-B45D725D475F}|Intermediate\\ProjectFiles\\MyProject.vcxproj|solutionrelative:Source\\MyProject\\Variant_Shooter\\ShooterCharacter.h||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
+    },
+    {
       "AbsoluteMoniker": "D:0:0:{F7E11032-986C-3F47-9960-B45D725D475F}|Intermediate\\ProjectFiles\\MyProject.vcxproj|C:\\CoursGTech\\B3\\GestionDeProjetCours\\NeuralNetworkUnreal\\MyProject\\Source\\MyProject\\MyProjectCharacter.h||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
       "RelativeMoniker": "D:0:0:{F7E11032-986C-3F47-9960-B45D725D475F}|Intermediate\\ProjectFiles\\MyProject.vcxproj|solutionrelative:Source\\MyProject\\MyProjectCharacter.h||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
     },
@@ -30,7 +38,7 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 3,
+          "SelectedChildIndex": 5,
           "Children": [
             {
               "$type": "Bookmark",
@@ -38,7 +46,33 @@
             },
             {
               "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "ShooterCharacter.cpp",
+              "DocumentMoniker": "C:\\CoursGTech\\B3\\GestionDeProjetCours\\NeuralNetworkUnreal\\MyProject\\Source\\MyProject\\Variant_Shooter\\ShooterCharacter.cpp",
+              "RelativeDocumentMoniker": "Source\\MyProject\\Variant_Shooter\\ShooterCharacter.cpp",
+              "ToolTip": "C:\\CoursGTech\\B3\\GestionDeProjetCours\\NeuralNetworkUnreal\\MyProject\\Source\\MyProject\\Variant_Shooter\\ShooterCharacter.cpp",
+              "RelativeToolTip": "Source\\MyProject\\Variant_Shooter\\ShooterCharacter.cpp",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAACwAAAAuAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000677|",
+              "WhenOpened": "2026-11-25T16:54:17.43Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
               "DocumentIndex": 3,
+              "Title": "ShooterCharacter.h",
+              "DocumentMoniker": "C:\\CoursGTech\\B3\\GestionDeProjetCours\\NeuralNetworkUnreal\\MyProject\\Source\\MyProject\\Variant_Shooter\\ShooterCharacter.h",
+              "RelativeDocumentMoniker": "Source\\MyProject\\Variant_Shooter\\ShooterCharacter.h",
+              "ToolTip": "C:\\CoursGTech\\B3\\GestionDeProjetCours\\NeuralNetworkUnreal\\MyProject\\Source\\MyProject\\Variant_Shooter\\ShooterCharacter.h",
+              "RelativeToolTip": "Source\\MyProject\\Variant_Shooter\\ShooterCharacter.h",
+              "ViewState": "AgIAAAwAAAAAAAAAAAAAACoAAAAOAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000680|",
+              "WhenOpened": "2026-11-25T16:54:17.129Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 5,
               "Title": "MyProjectCharacter.cpp",
               "DocumentMoniker": "C:\\CoursGTech\\B3\\GestionDeProjetCours\\NeuralNetworkUnreal\\MyProject\\Source\\MyProject\\MyProjectCharacter.cpp",
               "RelativeDocumentMoniker": "Source\\MyProject\\MyProjectCharacter.cpp",
@@ -50,7 +84,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 2,
+              "DocumentIndex": 4,
               "Title": "MyProjectCharacter.h",
               "DocumentMoniker": "C:\\CoursGTech\\B3\\GestionDeProjetCours\\NeuralNetworkUnreal\\MyProject\\Source\\MyProject\\MyProjectCharacter.h",
               "RelativeDocumentMoniker": "Source\\MyProject\\MyProjectCharacter.h",
@@ -58,8 +92,7 @@
               "RelativeToolTip": "Source\\MyProject\\MyProjectCharacter.h",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAABUAAAAtAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000680|",
-              "WhenOpened": "2026-11-23T11:22:52.219Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-11-23T11:22:52.219Z"
             },
             {
               "$type": "Document",
@@ -69,7 +102,7 @@
               "RelativeDocumentMoniker": "Source\\MyProject\\MLPComponent.cpp",
               "ToolTip": "C:\\CoursGTech\\B3\\GestionDeProjetCours\\NeuralNetworkUnreal\\MyProject\\Source\\MyProject\\MLPComponent.cpp",
               "RelativeToolTip": "Source\\MyProject\\MLPComponent.cpp",
-              "ViewState": "AgIAANIAAAAAAAAAAAAAAAABAAAnAAAAAAAAAA==",
+              "ViewState": "AgIAAAoBAAAAAAAAAAAAACABAAA0AAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000677|",
               "WhenOpened": "2026-11-23T10:31:20.435Z",
               "EditorCaption": ""
@@ -82,14 +115,14 @@
               "RelativeDocumentMoniker": "Source\\MyProject\\MLPComponent.h",
               "ToolTip": "C:\\CoursGTech\\B3\\GestionDeProjetCours\\NeuralNetworkUnreal\\MyProject\\Source\\MyProject\\MLPComponent.h",
               "RelativeToolTip": "Source\\MyProject\\MLPComponent.h",
-              "ViewState": "AgIAABcAAAAAAAAAAAArwDYAAAAgAAAAAAAAAA==",
+              "ViewState": "AgIAACcAAAAAAAAAAAAAAEcAAAA5AAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000680|",
               "WhenOpened": "2026-11-23T10:31:20.448Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 4,
+              "DocumentIndex": 6,
               "Title": "MyProject.cpp",
               "DocumentMoniker": "C:\\CoursGTech\\B3\\GestionDeProjetCours\\NeuralNetworkUnreal\\MyProject\\Source\\MyProject\\MyProject.cpp",
               "RelativeDocumentMoniker": "Source\\MyProject\\MyProject.cpp",

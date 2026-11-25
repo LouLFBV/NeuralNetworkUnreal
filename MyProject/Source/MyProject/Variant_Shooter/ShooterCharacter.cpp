@@ -14,6 +14,10 @@
 #include "TimerManager.h"
 #include "ShooterGameMode.h"
 
+#include "Components/SceneCaptureComponent2D.h"
+#include "Engine/TextureRenderTarget2D.h"
+#include "MLPComponent.h"
+
 AShooterCharacter::AShooterCharacter()
 {
 	// create the noise emitter component
@@ -21,6 +25,24 @@ AShooterCharacter::AShooterCharacter()
 
 	// configure movement
 	GetCharacterMovement()->RotationRate = FRotator(0.0f, 600.0f, 0.0f);
+
+	//Créer le composant
+	MLPComponent = CreateDefaultSubobject<UMLPComponent>(TEXT("MLPComponent"));
+
+	//Créer la caméra de capture et l'attacher à la caméra FP
+	VisionCaptureComponent = CreateDefaultSubobject<USceneCaptureComponent2D>(TEXT("VisionCaptureComponent"));
+	VisionCaptureComponent->SetupAttachment(GetFirstPersonCameraComponent());
+	VisionCaptureComponent->SetRelativeLocation(FVector::ZeroVector);
+	VisionCaptureComponent->SetRelativeRotation(FRotator::ZeroRotator);
+
+	// Configuration de la capture pour isoler proprement le rouge 
+	VisionCaptureComponent->FOVAngle = 90.0f;
+	VisionCaptureComponent->CaptureSource = ESceneCaptureSource::SCS_FinalColorLDR;
+	VisionCaptureComponent->bCaptureEveryFrame = true;
+	VisionCaptureComponent->ShowFlags.SetMotionBlur(false);
+	VisionCaptureComponent->ShowFlags.SetEyeAdaptation(false);
+
+	VisionCaptureComponent->SetVisibility(false);
 }
 
 void AShooterCharacter::BeginPlay()
@@ -32,6 +54,25 @@ void AShooterCharacter::BeginPlay()
 
 	// update the HUD
 	OnDamaged.Broadcast(1.0f);
+
+	//Création dynamique du Render Target 32x32 si aucun n'est assigné dans le BP
+	if (!VisionRenderTarget)
+	{
+		VisionRenderTarget = NewObject<UTextureRenderTarget2D>(this);
+		VisionRenderTarget->RenderTargetFormat = RTF_RGBA8;
+		VisionRenderTarget->InitAutoFormat(32, 32);
+		VisionRenderTarget->UpdateResourceImmediate(true);
+	}
+
+	//Liaison entre la caméra de capture, le Render Target et le réseau de neurones
+	if (VisionCaptureComponent && MLPComponent)
+	{
+		VisionCaptureComponent->TextureTarget = VisionRenderTarget;
+		MLPComponent->VisionRenderTarget = VisionRenderTarget;
+		MLPComponent->CameraFOV = VisionCaptureComponent->FOVAngle;
+	}
+
+
 }
 
 void AShooterCharacter::EndPlay(EEndPlayReason::Type EndPlayReason)
@@ -56,6 +97,16 @@ void AShooterCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
 
 		// Switch weapon
 		EnhancedInputComponent->BindAction(SwitchWeaponAction, ETriggerEvent::Triggered, this, &AShooterCharacter::DoSwitchWeapon);
+
+		if (AIAimAction && MLPComponent)
+		{
+			EnhancedInputComponent->BindAction(AIAimAction, ETriggerEvent::Started, MLPComponent, &UMLPComponent::RunAIStep);
+		}
+
+		if (AutoTrainAction && MLPComponent)
+		{
+			EnhancedInputComponent->BindAction(AutoTrainAction, ETriggerEvent::Started, MLPComponent, &UMLPComponent::ToggleAutoTraining);
+		}
 	}
 
 }

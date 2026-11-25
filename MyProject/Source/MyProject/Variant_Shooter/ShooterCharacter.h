@@ -12,6 +12,11 @@ class UInputAction;
 class UInputComponent;
 class UPawnNoiseEmitterComponent;
 
+class USceneCaptureComponent2D;
+class UTextureRenderTarget2D;
+class UMLPComponent;
+
+
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FBulletCountUpdatedDelegate, int32, MagazineSize, int32, Bullets);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FDamagedDelegate, float, LifePercent);
 
@@ -31,6 +36,15 @@ class MYPROJECT_API AShooterCharacter : public AMyProjectCharacter, public IShoo
 
 protected:
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MLP|Vision", meta = (AllowPrivateAccess = "true"))
+	USceneCaptureComponent2D* VisionCaptureComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MLP", meta = (AllowPrivateAccess = "true"))
+	UMLPComponent* MLPComponent;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MLP|Vision")
+	UTextureRenderTarget2D* VisionRenderTarget;
+
 	/** Fire weapon input action */
 	UPROPERTY(EditAnywhere, Category ="Input")
 	UInputAction* FireAction;
@@ -38,6 +52,13 @@ protected:
 	/** Switch weapon input action */
 	UPROPERTY(EditAnywhere, Category ="Input")
 	UInputAction* SwitchWeaponAction;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input", meta = (AllowPrivateAccess = "true"))
+	UInputAction* AIAimAction;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input", meta = (AllowPrivateAccess = "true"))
+	UInputAction* AutoTrainAction;
+
 
 	/** Name of the first person mesh weapon socket */
 	UPROPERTY(EditAnywhere, Category ="Weapons")

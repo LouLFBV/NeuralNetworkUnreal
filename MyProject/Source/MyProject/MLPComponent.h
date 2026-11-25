@@ -6,7 +6,7 @@
 #include "Components/ActorComponent.h"
 #include "MLPComponent.generated.h"
 
-class UTextureRendererTarget2D;
+class UTextureRenderTarget2D;
 
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
 class MYPROJECT_API UMLPComponent : public UActorComponent
@@ -24,13 +24,13 @@ public:
 	int32 HiddenNeuronCount = 32;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MLP|Training")
-	float LearningRate = 0.15f;
+	float LearningRate = 0.02f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MLP|Training")
 	bool bTrainOnStep = true;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MLP|Vision")
-	UTextureRendererTarget2D* VisionRenderTarget = nullptr;
+	UTextureRenderTarget2D* VisionRenderTarget = nullptr;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MLP|Vision")
 	float CameraFOV = 90.0f;
@@ -67,6 +67,9 @@ private :
 	int32 TotalShots = 0;
 	int32 SuccessfulHits = 0;
 	FTimerHandle AutoTrainTimerHandle;
+
+	bool bHasTrainingAnchor = false;
+	FRotator TrainingAnchorRotation = FRotator::ZeroRotator;
 
 	void InitializeNetwork();
 	float Sigmoid(float X) const;
