@@ -36,7 +36,7 @@ public:
 	float CameraFOV = 90.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MLP|Vision")
-	float RedThreshold = 0.25f;
+	float RedThreshold = 0.15f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MLP|Weapon")
 	float TraceDistance = 1000.0f;
@@ -73,9 +73,9 @@ private :
 
 	void InitializeNetwork();
 	float Sigmoid(float X) const;
-	float SigmoidDerivate(float SigmoidOutput) const;
+	float SigmoidDerivative(float SigmoidOutput) const;
 	void ForwardPass();
-	void BackPropagate(float ExpectedX, float ExpectedY);
+	void Backpropagate(float ExpectedX, float ExpectedY);
 
 	bool ExtractRedInputsAndTarget(float& OutputExpectedX, float& OutputExpectedY);
 };

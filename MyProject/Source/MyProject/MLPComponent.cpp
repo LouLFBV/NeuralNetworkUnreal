@@ -1,8 +1,6 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
-
 #include "MLPComponent.h"
 #include "Engine/TextureRenderTarget2D.h"
+#include "TextureResource.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerController.h"
 #include "Engine/World.h"
@@ -17,124 +15,7 @@ UMLPComponent::UMLPComponent()
 void UMLPComponent::BeginPlay()
 {
 	Super::BeginPlay();
-	InitializeNetwork();	
-}
-
-void UMLPComponent::RunAIStep()
-{
-	APawn* OwnerPawn = Cast<APawn>(GetOwner());
-	if (!OwnerPawn)
-	{
-		return;
-	}
-
-	APlayerController* PC = Cast<APlayerController>(OwnerPawn->GetController());
-	if (!PC)
-	{
-		return;
-	}
-
-	//Repalcer la caméra face aux ennemis avec un léger décalage aléatoire
-	if (bHasTrainingAnchor)
-	{
-		const float RandomYaw = FMath::FRandRange(-15.0f, 15.0f);
-		const float RandomPitch = FMath::FRandRange(-10.0f, 10.0f);
-		PC->SetControlRotation(TrainingAnchorRotation + FRotator(RandomPitch, RandomYaw, 0.0f));
-	}
-
-	// Lire l'image et trouver du rouge
-	float ExpectedX = 0.5f;
-	float ExpectedY = 0.5f;
-	if (!ExtractRedInputsAndTarget(ExpectedX, ExpectedY))
-	{
-		UE_LOG(LogTemp, Warning, TEXT("[MLP] Aucun ennemi rouge visible dans le champ de vision."));
-		return;
-	}
-
-	// Prédiction du réseau de neurones 
-	ForwardPass();
-	const float PredictedX = OutputActivations[0];
-	const float PredictedY = OutputActivations[1];
-
-	// Oriente la caméra vers la prédiction
-	const float DeltaYaw = (PredictedX - 0.5) * CameraFOV;
-	const float DeltaPitch = (0.5 - PredictedY) * CameraFOV;
-
-	FRotator CurrentRotation = PC->GetControlRotation();
-	FRotator TargetRotation = CurrentRotation + FRotator(DeltaPitch, DeltaYaw, 0.0f);
-	PC->SetControlRotation(TargetRotation);
-
-	// Tir automatique
-	FVector CameraLocation;
-	FRotator CameraRotation;
-	PC->GetPlayerViewPoint(CameraLocation, CameraRotation);
-
-	FVector AimDirection = TargetRotation.Vector();
-	FVector TraceEnd = CameraLocation + (AimDirection * TraceDistance);
-
-	FHitResult HitResult;
-	FCollisionQueryParams QueryParams;
-	QueryParams.AddIgnoredActor(OwnerPawn);
-
-	const bool bHit = GetWorld()->LineTraceSingleByChannel(
-		HitResult,
-		CameraLocation,
-		TraceEnd,
-		ECC_Visibility,
-		QueryParams
-		);
-
-	const bool bHitEnemy = bHit && HitResult.GetActor() && HitResult.GetActor()->ActorHasTag(FName("Enemy"));
-
-	TotalShots++;
-
-	if (bHitEnemy)
-	{
-		SuccessfulHits++;
-	}
-
-	//Debug visuel de tir (vert = touché, jaune = raté)
-	DrawDebugLine(GetWorld(), CameraLocation, bHit ? HitResult.ImpactPoint : TraceEnd, bHitEnemy ? FColor::Green : FColor::Yellow, false, 1.0f, 0.0f, 1.5f);
-
-	// Calcul du coût et Backpropagation
-	const float Cost = FMath::Square(ExpectedX - PredictedX) + FMath::Square(ExpectedY - PredictedY);
-	if (bTrainOnStep)
-	{
-		BackPropagate(ExpectedX, ExpectedY);
-	}
-
-	const float Accuracy = (static_cast<float>(SuccessfulHits)) / (static_cast<float>(TotalShots)) * 100.0f;
-	UE_LOG(LogTemp, Log, TEXT("[MLP] Tir : %d | Resultat : %s | Cost : %.4f | Precision : %.1f%%"),
-		TotalShots, bHitEnemy ? TEXT("TOUCHE") : TEXT("RATE"), Cost, Accuracy);
-}
-
-void UMLPComponent::ToggleAutoTraining()
-{
-	if (!GetWorld())
-	{
-		return;
-	}
-
-	if (GetWorld()->GetTimerManager().IsTimerActive(AutoTrainTimerHandle))
-	{
-		GetWorld()->GetTimerManager().ClearTimer(AutoTrainTimerHandle);
-		bHasTrainingAnchor = false;
-		UE_LOG(LogTemp, Log, TEXT("[MLP] Entrainement automatique ARRETE."));
-	}
-	else
-	{
-		if (APawn* OwnerPawn = Cast<APawn>(GetOwner()))
-		{
-			if (APlayerController* PC = Cast<APlayerController>(OwnerPawn->GetController()))
-			{
-				TrainingAnchorRotation = PC->GetControlRotation();
-				bHasTrainingAnchor = true;
-			}
-		}
-
-		GetWorld()->GetTimerManager().SetTimer(AutoTrainTimerHandle, this, &UMLPComponent::RunAIStep, 0.1f, true);
-		UE_LOG(LogTemp, Log, TEXT("[MLP] Entrainement automatique DEMARRE."))
-	}
+	InitializeNetwork();
 }
 
 void UMLPComponent::InitializeNetwork()
@@ -151,43 +32,30 @@ void UMLPComponent::InitializeNetwork()
 	OutputDeltas.SetNumZeroed(OutputNeuronCount);
 	HiddenDeltas.SetNumZeroed(HiddenNeuronCount);
 
-	for (float& W : WeightsInputHidden) 
-	{
-		W = FMath::FRandRange(-0.02f, 0.02); 
-	}
-	for (float& B : HiddenBiases) 
-	{
-		B = 0.0f;
-	}
-	for (float& W : WeightsHiddenOutput) 
-	{
-		W = FMath::FRandRange(-0.05f, 0.05f); 
-	}
-	for (float& B : OutputBiases) 
-	{
-		B = 0.0f;
-	}
+	// Poids faibles pour éviter la saturation de la sigmoïde sur 1024 entrées
+	for (float& W : WeightsInputHidden) { W = FMath::FRandRange(-0.02f, 0.02f); }
+	for (float& B : HiddenBiases) { B = 0.0f; }
+	for (float& W : WeightsHiddenOutput) { W = FMath::FRandRange(-0.05f, 0.05f); }
+	for (float& B : OutputBiases) { B = 0.0f; }
 }
 
 float UMLPComponent::Sigmoid(float X) const
 {
 	const float ClampedX = FMath::Clamp(X, -50.0f, 50.0f);
-	return 1/(1 + FMath::Exp(-ClampedX));
+	return 1.0f / (1.0f + FMath::Exp(-ClampedX));
 }
 
-float UMLPComponent::SigmoidDerivate(float SigmoidOutput) const
+float UMLPComponent::SigmoidDerivative(float SigmoidOutput) const
 {
-	// Dérivée de la sigmoïde : ResultSigmoid * (1 - ResultSigmoid)
-	return SigmoidOutput * (1 - SigmoidOutput);
+	return SigmoidOutput * (1.0f - SigmoidOutput);
 }
 
 void UMLPComponent::ForwardPass()
 {
-	// Hidden Layer
 	for (int32 h = 0; h < HiddenNeuronCount; ++h)
 	{
 		float WeightedSum = HiddenBiases[h];
-		const float RowOffset = h * InputNeuronCount;
+		const int32 RowOffset = h * InputNeuronCount;
 
 		for (int32 i = 0; i < InputNeuronCount; ++i)
 		{
@@ -197,11 +65,10 @@ void UMLPComponent::ForwardPass()
 		HiddenActivations[h] = Sigmoid(WeightedSum);
 	}
 
-	// Output Layer
 	for (int32 o = 0; o < OutputNeuronCount; ++o)
 	{
 		float WeightedSum = OutputBiases[o];
-		const float RowOffset = o * HiddenNeuronCount;
+		const int32 RowOffset = o * HiddenNeuronCount;
 
 		for (int32 h = 0; h < HiddenNeuronCount; ++h)
 		{
@@ -212,20 +79,17 @@ void UMLPComponent::ForwardPass()
 	}
 }
 
-void UMLPComponent::BackPropagate(float ExpectedX, float ExpectedY)
+void UMLPComponent::Backpropagate(float ExpectedX, float ExpectedY)
 {
 	const float Expected[OutputNeuronCount] = { ExpectedX, ExpectedY };
 
-	// Calcul et Stockage des dérivées de l'Output layer
 	for (int32 o = 0; o < OutputNeuronCount; ++o)
 	{
-		// Dérivée de (Expecteed - Output) ** 2 par rapport à Output pour redescendre de gradient
 		const float dCost_dOutput = 2.0f * (OutputActivations[o] - Expected[o]);
-		const float dOutput_dWI = SigmoidDerivate(OutputActivations[o]);
-		OutputDeltas[o] = dCost_dOutput * dCost_dOutput;
+		const float dOutput_dWI = SigmoidDerivative(OutputActivations[o]);
+		OutputDeltas[o] = dCost_dOutput * dOutput_dWI;
 	}
 
-	// Propagation vers le Hidden layer et stockage des valeurs communes
 	for (int32 h = 0; h < HiddenNeuronCount; ++h)
 	{
 		float ErrorSum = 0.0f;
@@ -233,14 +97,13 @@ void UMLPComponent::BackPropagate(float ExpectedX, float ExpectedY)
 		{
 			ErrorSum += OutputDeltas[o] * WeightsHiddenOutput[o * HiddenNeuronCount + h];
 		}
-		HiddenDeltas[h] = ErrorSum * SigmoidDerivate(HiddenActivations[h]);
-	}
 
-	// Application de la dernière influence et mise à jour des poids/biais
+		HiddenDeltas[h] = ErrorSum * SigmoidDerivative(HiddenActivations[h]);
+	}
 
 	for (int32 o = 0; o < OutputNeuronCount; ++o)
 	{
-		const float RowOffset = o * HiddenNeuronCount;
+		const int32 RowOffset = o * HiddenNeuronCount;
 		for (int32 h = 0; h < HiddenNeuronCount; ++h)
 		{
 			WeightsHiddenOutput[RowOffset + h] -= LearningRate * OutputDeltas[o] * HiddenActivations[h];
@@ -250,7 +113,7 @@ void UMLPComponent::BackPropagate(float ExpectedX, float ExpectedY)
 
 	for (int32 h = 0; h < HiddenNeuronCount; ++h)
 	{
-		const float RowOffset = h * InputNeuronCount;
+		const int32 RowOffset = h * InputNeuronCount;
 		for (int32 i = 0; i < InputNeuronCount; ++i)
 		{
 			WeightsInputHidden[RowOffset + i] -= LearningRate * HiddenDeltas[h] * InputActivations[i];
@@ -259,38 +122,54 @@ void UMLPComponent::BackPropagate(float ExpectedX, float ExpectedY)
 	}
 }
 
-bool UMLPComponent::ExtractRedInputsAndTarget(float& OutputExpectedX, float& OutputExpectedY)
+bool UMLPComponent::ExtractRedInputsAndTarget(float& OutExpectedX, float& OutExpectedY)
 {
 	if (!VisionRenderTarget)
 	{
+		UE_LOG(LogTemp, Error, TEXT("[MLP] Erreur : VisionRenderTarget est NULL !"));
 		return false;
 	}
 
-	FTextureRenderTargetResource* RTRessource = VisionRenderTarget->GameThread_GetRenderTargetResource();
-	if (!RTRessource)
+	FTextureRenderTargetResource* RTResource = VisionRenderTarget->GameThread_GetRenderTargetResource();
+	if (!RTResource)
 	{
+		UE_LOG(LogTemp, Error, TEXT("[MLP] Erreur : RTResource est NULL !"));
 		return false;
 	}
 
 	TArray<FColor> Pixels;
-	if (!RTRessource->ReadPixels(Pixels) || Pixels.Num() < InputNeuronCount)
+	if (!RTResource->ReadPixels(Pixels) || Pixels.Num() < InputNeuronCount)
 	{
+		UE_LOG(LogTemp, Error, TEXT("[MLP] Erreur : ReadPixels a echoue (Pixels=%d)."), Pixels.Num());
 		return false;
 	}
 
-	// Remplir les 1024 neurones d'entrée avec l'intensité de rouge [0, 1]
+	float MaxRedActivation = 0.0f;
+	FColor SamplePixel = FColor::Black;
+
 	for (int32 i = 0; i < InputNeuronCount; ++i)
 	{
 		const float R = Pixels[i].R / 255.0f;
 		const float G = Pixels[i].G / 255.0f;
 		const float B = Pixels[i].B / 255.0f;
 
-		//Isoler uniquement la couleur rouge pure
-		const float Redness = R - FMath::Max(G, B) * 1.5f;
-		InputActivations[i] = FMath::Clamp(Redness, 0.0f, 1.0f);
+		// Sur le mannequin rouge (R:150 G:98 B:109), R domine G et B sans excès de jaune (G - B)
+		const float RedOverGreen = R - G;
+		const float RedOverBlue = R - B;
+		const float Yellowish = FMath::Max(0.0f, G - B);
+
+		const float RawRed = FMath::Min(RedOverGreen, RedOverBlue) - (Yellowish * 2.0f);
+		const float Activation = FMath::Clamp(RawRed * 3.0f, 0.0f, 1.0f);
+
+		InputActivations[i] = Activation;
+
+		if (Activation > MaxRedActivation)
+		{
+			MaxRedActivation = Activation;
+			SamplePixel = Pixels[i];
+		}
 	}
 
-	// Isoler le plus gros amas de rouge (ennemi le plus proche)
 	TArray<bool> Visited;
 	Visited.SetNumZeroed(InputNeuronCount);
 
@@ -325,9 +204,8 @@ bool UMLPComponent::ExtractRedInputsAndTarget(float& OutputExpectedX, float& Out
 			SumX += ((X + 0.5f) / static_cast<float>(GridSize)) * W;
 			SumY += ((Y + 0.5f) / static_cast<float>(GridSize)) * W;
 
-			// Les 4 voisins (Haut, Bas, Gauche, Droite)
 			const int32 DX[4] = { 1, -1, 0, 0 };
-			const int32 DY[4] = { 0, 0, -1, 1 };
+			const int32 DY[4] = { 0, 0, 1, -1 };
 
 			for (int32 Dir = 0; Dir < 4; ++Dir)
 			{
@@ -337,7 +215,6 @@ bool UMLPComponent::ExtractRedInputsAndTarget(float& OutputExpectedX, float& Out
 				if (NX >= 0 && NX < GridSize && NY >= 0 && NY < GridSize)
 				{
 					const int32 NIdx = NY * GridSize + NX;
-
 					if (!Visited[NIdx] && InputActivations[NIdx] >= RedThreshold)
 					{
 						Visited[NIdx] = true;
@@ -357,13 +234,116 @@ bool UMLPComponent::ExtractRedInputsAndTarget(float& OutputExpectedX, float& Out
 
 	if (BestClusterWeight <= 0.0f)
 	{
-		return false; // Aucun ennemi rouge dans le champ de vision
+		UE_LOG(LogTemp, Warning, TEXT("[MLP] Aucun rouge detecte (MaxAct=%.3f, Seuil=%.2f, Pixel=(R:%d G:%d B:%d))."),
+			MaxRedActivation, RedThreshold, SamplePixel.R, SamplePixel.G, SamplePixel.B);
+		return false;
 	}
 
-
-	OutputExpectedX = BestCentroidX;
-	OutputExpectedY = BestCentroidY;
-
+	OutExpectedX = BestCentroidX;
+	OutExpectedY = BestCentroidY;
 	return true;
 }
 
+void UMLPComponent::RunAIStep()
+{
+	APawn* OwnerPawn = Cast<APawn>(GetOwner());
+	if (!OwnerPawn) return;
+
+	APlayerController* PC = Cast<APlayerController>(OwnerPawn->GetController());
+	if (!PC) return;
+
+	// 1. Lire l'image 32x32 et trouver le rouge dans le FOV
+	float ExpectedX = 0.5f;
+	float ExpectedY = 0.5f;
+	if (!ExtractRedInputsAndTarget(ExpectedX, ExpectedY))
+	{
+		if (bHasTrainingAnchor)
+		{
+			const float RandomYaw = FMath::FRandRange(-15.0f, 15.0f);
+			const float RandomPitch = FMath::FRandRange(-10.0f, 10.0f);
+			PC->SetControlRotation(TrainingAnchorRotation + FRotator(RandomPitch, RandomYaw, 0.0f));
+		}
+		return;
+	}
+
+	// 2. Prédiction du réseau de neurones
+	ForwardPass();
+	const float PredictedX = OutputActivations[0];
+	const float PredictedY = OutputActivations[1];
+
+	// 3. Orienter la caméra vers la prédiction
+	const float DeltaYaw = (PredictedX - 0.5f) * CameraFOV;
+	const float DeltaPitch = (0.5f - PredictedY) * CameraFOV;
+
+	FRotator CurrentRot = PC->GetControlRotation();
+	FRotator TargetRot = CurrentRot + FRotator(DeltaPitch, DeltaYaw, 0.0f);
+	PC->SetControlRotation(TargetRot);
+
+	// 4. Tir automatique
+	FVector CamLoc;
+	FRotator CamRot;
+	PC->GetPlayerViewPoint(CamLoc, CamRot);
+
+	const FVector AimDir = TargetRot.Vector();
+	const FVector TraceEnd = CamLoc + (AimDir * TraceDistance);
+
+	FHitResult HitResult;
+	FCollisionQueryParams QueryParams;
+	QueryParams.AddIgnoredActor(OwnerPawn);
+
+	const bool bHit = GetWorld()->LineTraceSingleByChannel(HitResult, CamLoc, TraceEnd, ECC_Visibility, QueryParams);
+	const bool bHitEnemy = bHit && HitResult.GetActor() && HitResult.GetActor()->ActorHasTag(FName("Enemy"));
+
+	TotalShots++;
+	if (bHitEnemy)
+	{
+		SuccessfulHits++;
+	}
+
+	DrawDebugLine(GetWorld(), CamLoc, bHit ? HitResult.ImpactPoint : TraceEnd, bHitEnemy ? FColor::Green : FColor::Red, false, 1.0f, 0, 1.5f);
+
+	// 5. Calcul du coût et Backpropagation
+	const float Cost = FMath::Square(ExpectedX - PredictedX) + FMath::Square(ExpectedY - PredictedY);
+	if (bTrainOnStep)
+	{
+		Backpropagate(ExpectedX, ExpectedY);
+	}
+
+	const float Accuracy = (static_cast<float>(SuccessfulHits) / static_cast<float>(TotalShots)) * 100.0f;
+	UE_LOG(LogTemp, Log, TEXT("[MLP] Tir %d | Resultat: %s | Cost: %.4f | Precision: %.1f%%"),
+		TotalShots, bHitEnemy ? TEXT("TOUCHE") : TEXT("RATE"), Cost, Accuracy);
+
+	// 6. Préparer l'angle de la frame suivante pour l'auto-entraînement
+	if (bHasTrainingAnchor)
+	{
+		const float RandomYaw = FMath::FRandRange(-15.0f, 15.0f);
+		const float RandomPitch = FMath::FRandRange(-10.0f, 10.0f);
+		PC->SetControlRotation(TrainingAnchorRotation + FRotator(RandomPitch, RandomYaw, 0.0f));
+	}
+}
+
+void UMLPComponent::ToggleAutoTraining()
+{
+	if (!GetWorld()) return;
+
+	if (GetWorld()->GetTimerManager().IsTimerActive(AutoTrainTimerHandle))
+	{
+		GetWorld()->GetTimerManager().ClearTimer(AutoTrainTimerHandle);
+		bHasTrainingAnchor = false;
+		UE_LOG(LogTemp, Log, TEXT("[MLP] Entrainement automatique ARRETE."));
+	}
+	else
+	{
+		if (APawn* OwnerPawn = Cast<APawn>(GetOwner()))
+		{
+			if (APlayerController* PC = Cast<APlayerController>(OwnerPawn->GetController()))
+			{
+				TrainingAnchorRotation = PC->GetControlRotation();
+				bHasTrainingAnchor = true;
+			}
+		}
+
+		GetWorld()->GetTimerManager().SetTimer(AutoTrainTimerHandle, this, &UMLPComponent::RunAIStep, 0.1f, true);
+		UE_LOG(LogTemp, Log, TEXT("[MLP] Entrainement automatique DEMARRE."));
+	}
+}
