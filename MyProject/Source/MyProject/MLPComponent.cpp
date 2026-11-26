@@ -144,7 +144,9 @@ bool UMLPComponent::ExtractRedInputsAndTarget(float& OutExpectedX, float& OutExp
 		return false;
 	}
 
+
 	float MaxRedActivation = 0.0f;
+	float BestRawRed = -999.0f;
 	FColor SamplePixel = FColor::Black;
 
 	for (int32 i = 0; i < InputNeuronCount; ++i)
@@ -153,18 +155,19 @@ bool UMLPComponent::ExtractRedInputsAndTarget(float& OutExpectedX, float& OutExp
 		const float G = Pixels[i].G / 255.0f;
 		const float B = Pixels[i].B / 255.0f;
 
-		// Sur le mannequin rouge (R:150 G:98 B:109), R domine G et B sans excès de jaune (G - B)
 		const float RedOverGreen = R - G;
 		const float RedOverBlue = R - B;
 		const float Yellowish = FMath::Max(0.0f, G - B);
 
-		const float RawRed = FMath::Min(RedOverGreen, RedOverBlue) - (Yellowish * 2.0f);
-		const float Activation = FMath::Clamp(RawRed * 3.0f, 0.0f, 1.0f);
+		// Tolère l'éclairage chaud tout en rejetant l'orange
+		const float RawRed = FMath::Min(RedOverGreen, RedOverBlue) - Yellowish;
+		const float Activation = FMath::Clamp(RawRed * 4.0f, 0.0f, 1.0f);
 
 		InputActivations[i] = Activation;
 
-		if (Activation > MaxRedActivation)
+		if (RawRed > BestRawRed)
 		{
+			BestRawRed = RawRed;
 			MaxRedActivation = Activation;
 			SamplePixel = Pixels[i];
 		}
@@ -238,6 +241,7 @@ bool UMLPComponent::ExtractRedInputsAndTarget(float& OutExpectedX, float& OutExp
 			MaxRedActivation, RedThreshold, SamplePixel.R, SamplePixel.G, SamplePixel.B);
 		return false;
 	}
+
 
 	OutExpectedX = BestCentroidX;
 	OutExpectedY = BestCentroidY;

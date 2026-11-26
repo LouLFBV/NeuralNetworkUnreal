@@ -42,6 +42,8 @@ AMyProjectCharacter::AMyProjectCharacter()
 	// Configure character movement
 	GetCharacterMovement()->BrakingDecelerationFalling = 1500.0f;
 	GetCharacterMovement()->AirControl = 0.5f;
+
+
 }
 
 void AMyProjectCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
