@@ -304,7 +304,8 @@ void UMLPComponent::RunAIStep()
 		SuccessfulHits++;
 	}
 
-	DrawDebugLine(GetWorld(), CamLoc, bHit ? HitResult.ImpactPoint : TraceEnd, bHitEnemy ? FColor::Green : FColor::Red, false, 1.0f, 0, 1.5f);
+	const FVector DebugStart = CamLoc - FVector(0.0f, 0.0f, 10.0f);
+	DrawDebugLine(GetWorld(), DebugStart, bHit ? HitResult.ImpactPoint : TraceEnd, bHitEnemy ? FColor::Green : FColor::Blue, false, 0.05f, 0, 0.8f);
 
 	// 5. Calcul du coût et Backpropagation
 	const float Cost = FMath::Square(ExpectedX - PredictedX) + FMath::Square(ExpectedY - PredictedY);
@@ -317,11 +318,11 @@ void UMLPComponent::RunAIStep()
 	UE_LOG(LogTemp, Log, TEXT("[MLP] Tir %d | Resultat: %s | Cost: %.4f | Precision: %.1f%%"),
 		TotalShots, bHitEnemy ? TEXT("TOUCHE") : TEXT("RATE"), Cost, Accuracy);
 
-	// 6. Préparer l'angle de la frame suivante pour l'auto-entraînement
+	// 6. Garder le mannequin principal dans le champ de vision pendant l'entraînement
 	if (bHasTrainingAnchor)
 	{
-		const float RandomYaw = FMath::FRandRange(-15.0f, 15.0f);
-		const float RandomPitch = FMath::FRandRange(-10.0f, 10.0f);
+		const float RandomYaw = FMath::FRandRange(-8.0f, 8.0f);
+		const float RandomPitch = FMath::FRandRange(-5.0f, 5.0f);
 		PC->SetControlRotation(TrainingAnchorRotation + FRotator(RandomPitch, RandomYaw, 0.0f));
 	}
 }

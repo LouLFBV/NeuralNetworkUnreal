@@ -24,7 +24,7 @@ public:
 	int32 HiddenNeuronCount = 32;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MLP|Training")
-	float LearningRate = 0.02f;
+	float LearningRate = 0.5f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MLP|Training")
 	bool bTrainOnStep = true;
