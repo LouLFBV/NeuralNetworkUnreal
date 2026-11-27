@@ -7,6 +7,7 @@
 #include "MLPComponent.generated.h"
 
 class UTextureRenderTarget2D;
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnHit);
 
 UCLASS(ClassGroup = (Custom), meta = (BlueprintSpawnableComponent))
 class MYPROJECT_API UMLPComponent : public UActorComponent
@@ -20,6 +21,9 @@ protected:
 	virtual void BeginPlay() override;
 
 public:
+	UPROPERTY(BlueprintAssignable, Category = "MLP|Events")
+	FOnHit OnHit;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MLP|Architecture")
 	int32 HiddenNeuronCount = 32;
 
@@ -40,6 +44,9 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MLP|Weapon")
 	float TraceDistance = 1000.0f;
+
+	UFUNCTION()
+	void SetHasWeapon(bool hasWeapon) { bHasWeapon = hasWeapon; };
 
 	UFUNCTION(BlueprintCallable, Category = "MLP")
 	void RunAIStep();
@@ -78,4 +85,6 @@ private:
 	void Backpropagate(float ExpectedX, float ExpectedY);
 
 	bool ExtractRedInputsAndTarget(float& OutputExpectedX, float& OutputExpectedY);
+
+	bool bHasWeapon = false;
 };

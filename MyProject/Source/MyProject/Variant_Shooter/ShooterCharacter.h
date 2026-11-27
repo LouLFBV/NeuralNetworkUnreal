@@ -59,6 +59,8 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input", meta = (AllowPrivateAccess = "true"))
 	UInputAction* AutoTrainAction;
 
+	UFUNCTION()
+	void HandleAIHit();
 
 	/** Name of the first person mesh weapon socket */
 	UPROPERTY(EditAnywhere, Category ="Weapons")
@@ -212,4 +214,8 @@ public:
 
 	/** Sets the team ID for this character */
 	void SetTeam(uint8 Team);
+
+private :
+
+	FTimerHandle AITimerHandle;
 };

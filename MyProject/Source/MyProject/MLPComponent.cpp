@@ -1,393 +1,364 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
-
-
-#include "ShooterCharacter.h"
-#include "ShooterWeapon.h"
-#include "EnhancedInputComponent.h"
-#include "Components/InputComponent.h"
-#include "Components/PawnNoiseEmitterComponent.h"
-#include "GameFramework/CharacterMovementComponent.h"
-#include "Components/SkeletalMeshComponent.h"
-#include "Components/CapsuleComponent.h"
-#include "Engine/World.h"
-#include "Camera/CameraComponent.h"
-#include "TimerManager.h"
-#include "ShooterGameMode.h"
-
-#include "Components/SceneCaptureComponent2D.h"
-#include "Engine/TextureRenderTarget2D.h"
 #include "MLPComponent.h"
+#include "Engine/TextureRenderTarget2D.h"
+#include "TextureResource.h"
+#include "GameFramework/Pawn.h"
+#include "GameFramework/PlayerController.h"
+#include "Engine/World.h"
+#include "DrawDebugHelpers.h"
+#include "TimerManager.h"
 
-AShooterCharacter::AShooterCharacter()
+UMLPComponent::UMLPComponent()
 {
-	// create the noise emitter component
-	PawnNoiseEmitter = CreateDefaultSubobject<UPawnNoiseEmitterComponent>(TEXT("Pawn Noise Emitter"));
-
-	// configure movement
-	GetCharacterMovement()->RotationRate = FRotator(0.0f, 600.0f, 0.0f);
-
-	// Créer le composant MLP
-	MLPComponent = CreateDefaultSubobject<UMLPComponent>(TEXT("MLPComponent"));
-
-	// Créer la caméra de capture et l'attacher à la caméra FP
-	VisionCaptureComponent = CreateDefaultSubobject<USceneCaptureComponent2D>(TEXT("VisionCaptureComponent"));
-	VisionCaptureComponent->SetupAttachment(GetFirstPersonCameraComponent());
-	VisionCaptureComponent->SetRelativeLocation(FVector::ZeroVector);
-	VisionCaptureComponent->SetRelativeRotation(FRotator::ZeroRotator);
-
-	// Configuration de base de la capture
-	VisionCaptureComponent->FOVAngle = 90.0f;
-	VisionCaptureComponent->CaptureSource = ESceneCaptureSource::SCS_FinalColorLDR;
-	VisionCaptureComponent->bCaptureEveryFrame = true;
+	PrimaryComponentTick.bCanEverTick = false;
 }
 
-void AShooterCharacter::BeginPlay()
+void UMLPComponent::BeginPlay()
 {
 	Super::BeginPlay();
+	InitializeNetwork();
+}
 
-	// reset HP to max
-	CurrentHP = MaxHP;
+void UMLPComponent::InitializeNetwork()
+{
+	InputActivations.SetNumZeroed(InputNeuronCount);
+	HiddenActivations.SetNumZeroed(HiddenNeuronCount);
+	OutputActivations.SetNumZeroed(OutputNeuronCount);
 
-	// update the HUD
-	OnDamaged.Broadcast(1.0f);
+	WeightsInputHidden.SetNum(InputNeuronCount * HiddenNeuronCount);
+	HiddenBiases.SetNum(HiddenNeuronCount);
+	WeightsHiddenOutput.SetNum(HiddenNeuronCount * OutputNeuronCount);
+	OutputBiases.SetNum(OutputNeuronCount);
 
-	// Création dynamique du Render Target 32x32 si aucun n'est assigné dans le BP
+	OutputDeltas.SetNumZeroed(OutputNeuronCount);
+	HiddenDeltas.SetNumZeroed(HiddenNeuronCount);
+
+	// Poids faibles pour éviter la saturation de la sigmoïde sur 1024 entrées
+	for (float& W : WeightsInputHidden) { W = FMath::FRandRange(-0.02f, 0.02f); }
+	for (float& B : HiddenBiases) { B = 0.0f; }
+	for (float& W : WeightsHiddenOutput) { W = FMath::FRandRange(-0.05f, 0.05f); }
+	for (float& B : OutputBiases) { B = 0.0f; }
+}
+
+float UMLPComponent::Sigmoid(float X) const
+{
+	const float ClampedX = FMath::Clamp(X, -50.0f, 50.0f);
+	return 1.0f / (1.0f + FMath::Exp(-ClampedX));
+}
+
+float UMLPComponent::SigmoidDerivative(float SigmoidOutput) const
+{
+	return SigmoidOutput * (1.0f - SigmoidOutput);
+}
+
+void UMLPComponent::ForwardPass()
+{
+	for (int32 h = 0; h < HiddenNeuronCount; ++h)
+	{
+		float WeightedSum = HiddenBiases[h];
+		const int32 RowOffset = h * InputNeuronCount;
+
+		for (int32 i = 0; i < InputNeuronCount; ++i)
+		{
+			WeightedSum += InputActivations[i] * WeightsInputHidden[RowOffset + i];
+		}
+
+		HiddenActivations[h] = Sigmoid(WeightedSum);
+	}
+
+	for (int32 o = 0; o < OutputNeuronCount; ++o)
+	{
+		float WeightedSum = OutputBiases[o];
+		const int32 RowOffset = o * HiddenNeuronCount;
+
+		for (int32 h = 0; h < HiddenNeuronCount; ++h)
+		{
+			WeightedSum += HiddenActivations[h] * WeightsHiddenOutput[RowOffset + h];
+		}
+
+		OutputActivations[o] = Sigmoid(WeightedSum);
+	}
+}
+
+void UMLPComponent::Backpropagate(float ExpectedX, float ExpectedY)
+{
+	const float Expected[OutputNeuronCount] = { ExpectedX, ExpectedY };
+
+	for (int32 o = 0; o < OutputNeuronCount; ++o)
+	{
+		const float dCost_dOutput = 2.0f * (OutputActivations[o] - Expected[o]);
+		const float dOutput_dWI = SigmoidDerivative(OutputActivations[o]);
+		OutputDeltas[o] = dCost_dOutput * dOutput_dWI;
+	}
+
+	for (int32 h = 0; h < HiddenNeuronCount; ++h)
+	{
+		float ErrorSum = 0.0f;
+		for (int32 o = 0; o < OutputNeuronCount; ++o)
+		{
+			ErrorSum += OutputDeltas[o] * WeightsHiddenOutput[o * HiddenNeuronCount + h];
+		}
+
+		HiddenDeltas[h] = ErrorSum * SigmoidDerivative(HiddenActivations[h]);
+	}
+
+	for (int32 o = 0; o < OutputNeuronCount; ++o)
+	{
+		const int32 RowOffset = o * HiddenNeuronCount;
+		for (int32 h = 0; h < HiddenNeuronCount; ++h)
+		{
+			WeightsHiddenOutput[RowOffset + h] -= LearningRate * OutputDeltas[o] * HiddenActivations[h];
+		}
+		OutputBiases[o] -= LearningRate * OutputDeltas[o];
+	}
+
+	for (int32 h = 0; h < HiddenNeuronCount; ++h)
+	{
+		const int32 RowOffset = h * InputNeuronCount;
+		for (int32 i = 0; i < InputNeuronCount; ++i)
+		{
+			WeightsInputHidden[RowOffset + i] -= LearningRate * HiddenDeltas[h] * InputActivations[i];
+		}
+		HiddenBiases[h] -= LearningRate * HiddenDeltas[h];
+	}
+}
+
+bool UMLPComponent::ExtractRedInputsAndTarget(float& OutExpectedX, float& OutExpectedY)
+{
 	if (!VisionRenderTarget)
 	{
-		VisionRenderTarget = NewObject<UTextureRenderTarget2D>(this);
-		VisionRenderTarget->RenderTargetFormat = RTF_RGBA8;
-		VisionRenderTarget->TargetGamma = 2.2f;
-		VisionRenderTarget->InitAutoFormat(32, 32);
-		VisionRenderTarget->UpdateResourceImmediate(true);
+		UE_LOG(LogTemp, Error, TEXT("[MLP] Erreur : VisionRenderTarget est NULL !"));
+		return false;
 	}
 
-	// Liaison et configuration active en jeu (écrase les anciennes valeurs du Blueprint)
-	if (VisionCaptureComponent && MLPComponent)
+	FTextureRenderTargetResource* RTResource = VisionRenderTarget->GameThread_GetRenderTargetResource();
+	if (!RTResource)
 	{
-		VisionCaptureComponent->SetVisibility(true);
-		VisionCaptureComponent->TextureTarget = VisionRenderTarget;
-		VisionCaptureComponent->bCaptureEveryFrame = true;
-
-		// 1. Empêcher la caméra de filmer l'intérieur de la tête du joueur
-		VisionCaptureComponent->HiddenActors.AddUnique(this);
-
-		// 2. Activer l'exposition automatique et couper le flou de mouvement
-		VisionCaptureComponent->ShowFlags.SetMotionBlur(false);
-		VisionCaptureComponent->ShowFlags.SetEyeAdaptation(true);
-
-		MLPComponent->VisionRenderTarget = VisionRenderTarget;
-		MLPComponent->CameraFOV = VisionCaptureComponent->FOVAngle;
+		UE_LOG(LogTemp, Error, TEXT("[MLP] Erreur : RTResource est NULL !"));
+		return false;
 	}
-}
-void AShooterCharacter::EndPlay(EEndPlayReason::Type EndPlayReason)
-{
-	Super::EndPlay(EndPlayReason);
 
-	// clear the respawn timer
-	GetWorld()->GetTimerManager().ClearTimer(RespawnTimer);
-}
-
-void AShooterCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
-{
-	// base class handles move, aim and jump inputs
-	Super::SetupPlayerInputComponent(PlayerInputComponent);
-
-	// Set up action bindings
-	if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(PlayerInputComponent))
+	TArray<FColor> Pixels;
+	if (!RTResource->ReadPixels(Pixels) || Pixels.Num() < InputNeuronCount)
 	{
-		// Firing
-		EnhancedInputComponent->BindAction(FireAction, ETriggerEvent::Started, this, &AShooterCharacter::DoStartFiring);
-		EnhancedInputComponent->BindAction(FireAction, ETriggerEvent::Completed, this, &AShooterCharacter::DoStopFiring);
+		UE_LOG(LogTemp, Error, TEXT("[MLP] Erreur : ReadPixels a echoue (Pixels=%d)."), Pixels.Num());
+		return false;
+	}
 
-		// Switch weapon
-		EnhancedInputComponent->BindAction(SwitchWeaponAction, ETriggerEvent::Triggered, this, &AShooterCharacter::DoSwitchWeapon);
 
-		if (AIAimAction && MLPComponent)
+	float MaxRedActivation = 0.0f;
+	float BestRawRed = -999.0f;
+	FColor SamplePixel = FColor::Black;
+
+	for (int32 i = 0; i < InputNeuronCount; ++i)
+	{
+		const float R = Pixels[i].R / 255.0f;
+		const float G = Pixels[i].G / 255.0f;
+		const float B = Pixels[i].B / 255.0f;
+
+		const float RedOverGreen = R - G;
+		const float RedOverBlue = R - B;
+		const float Yellowish = FMath::Max(0.0f, G - B);
+
+		// Tolère l'éclairage chaud tout en rejetant l'orange
+		const float RawRed = FMath::Min(RedOverGreen, RedOverBlue) - Yellowish;
+		const float Activation = FMath::Clamp(RawRed * 4.0f, 0.0f, 1.0f);
+
+		InputActivations[i] = Activation;
+
+		if (RawRed > BestRawRed)
 		{
-			EnhancedInputComponent->BindAction(AIAimAction, ETriggerEvent::Started, MLPComponent, &UMLPComponent::RunAIStep);
-		}
-
-		if (AutoTrainAction && MLPComponent)
-		{
-			EnhancedInputComponent->BindAction(AutoTrainAction, ETriggerEvent::Started, MLPComponent, &UMLPComponent::ToggleAutoTraining);
+			BestRawRed = RawRed;
+			MaxRedActivation = Activation;
+			SamplePixel = Pixels[i];
 		}
 	}
 
-}
+	TArray<bool> Visited;
+	Visited.SetNumZeroed(InputNeuronCount);
 
-float AShooterCharacter::TakeDamage(float Damage, struct FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
-{
-	// ignore if already dead
-	if (CurrentHP <= 0.0f)
+	float BestClusterWeight = 0.0f;
+	float BestCentroidX = 0.5f;
+	float BestCentroidY = 0.5f;
+
+	for (int32 StartIdx = 0; StartIdx < InputNeuronCount; ++StartIdx)
 	{
-		return 0.0f;
-	}
-
-	// Reduce HP
-	CurrentHP -= Damage;
-
-	// Have we depleted HP?
-	if (CurrentHP <= 0.0f)
-	{
-		Die();
-	}
-
-	// update the HUD
-	OnDamaged.Broadcast(FMath::Max(0.0f, CurrentHP / MaxHP));
-
-	return Damage;
-}
-
-void AShooterCharacter::DoAim(float Yaw, float Pitch)
-{
-	// only route inputs if the character is not dead
-	if (!IsDead())
-	{
-		Super::DoAim(Yaw, Pitch);
-	}
-}
-
-void AShooterCharacter::DoMove(float Right, float Forward)
-{
-	// only route inputs if the character is not dead
-	if (!IsDead())
-	{
-		Super::DoMove(Right, Forward);
-	}
-}
-
-void AShooterCharacter::DoJumpStart()
-{
-	// only route inputs if the character is not dead
-	if (!IsDead())
-	{
-		Super::DoJumpStart();
-	}
-}
-
-void AShooterCharacter::DoJumpEnd()
-{
-	// only route inputs if the character is not dead
-	if (!IsDead())
-	{
-		Super::DoJumpEnd();
-	}
-}
-
-void AShooterCharacter::DoStartFiring()
-{
-	// fire the current weapon
-	if (CurrentWeapon && !IsDead())
-	{
-		CurrentWeapon->StartFiring();
-	}
-}
-
-void AShooterCharacter::DoStopFiring()
-{
-	// stop firing the current weapon
-	if (CurrentWeapon && !IsDead())
-	{
-		CurrentWeapon->StopFiring();
-	}
-}
-
-void AShooterCharacter::DoSwitchWeapon()
-{
-	// ensure we have at least two weapons two switch between
-	if (OwnedWeapons.Num() > 1 && !IsDead())
-	{
-		// deactivate the old weapon
-		CurrentWeapon->DeactivateWeapon();
-
-		// find the index of the current weapon in the owned list
-		int32 WeaponIndex = OwnedWeapons.Find(CurrentWeapon);
-
-		// is this the last weapon?
-		if (WeaponIndex == OwnedWeapons.Num() - 1)
+		if (Visited[StartIdx] || InputActivations[StartIdx] < RedThreshold)
 		{
-			// loop back to the beginning of the array
-			WeaponIndex = 0;
-		}
-		else {
-			// select the next weapon index
-			++WeaponIndex;
+			continue;
 		}
 
-		// set the new weapon as current
-		CurrentWeapon = OwnedWeapons[WeaponIndex];
+		TArray<int32> Queue;
+		Queue.Add(StartIdx);
+		Visited[StartIdx] = true;
 
-		// activate the new weapon
-		CurrentWeapon->ActivateWeapon(PlayerTag);
-	}
-}
+		float ClusterWeight = 0.0f;
+		float SumX = 0.0f;
+		float SumY = 0.0f;
 
-void AShooterCharacter::AttachWeaponMeshes(AShooterWeapon* Weapon)
-{
-	const FAttachmentTransformRules AttachmentRule(EAttachmentRule::SnapToTarget, false);
-
-	// attach the weapon actor
-	Weapon->AttachToActor(this, AttachmentRule);
-
-	// attach the weapon meshes
-	Weapon->GetFirstPersonMesh()->AttachToComponent(GetFirstPersonMesh(), AttachmentRule, FirstPersonWeaponSocket);
-	Weapon->GetThirdPersonMesh()->AttachToComponent(GetMesh(), AttachmentRule, FirstPersonWeaponSocket);
-
-}
-
-void AShooterCharacter::PlayFiringMontage(UAnimMontage* Montage)
-{
-	// stub
-}
-
-void AShooterCharacter::AddWeaponRecoil(float Recoil)
-{
-	// apply the recoil as pitch input
-	AddControllerPitchInput(Recoil);
-}
-
-void AShooterCharacter::UpdateWeaponHUD(int32 CurrentAmmo, int32 MagazineSize)
-{
-	OnBulletCountUpdated.Broadcast(MagazineSize, CurrentAmmo);
-}
-
-FVector AShooterCharacter::GetWeaponTargetLocation()
-{
-	// trace ahead from the camera viewpoint
-	FHitResult OutHit;
-
-	const FVector Start = GetFirstPersonCameraComponent()->GetComponentLocation();
-	const FVector End = Start + (GetFirstPersonCameraComponent()->GetForwardVector() * MaxAimDistance);
-
-	FCollisionQueryParams QueryParams;
-	QueryParams.AddIgnoredActor(this);
-
-	GetWorld()->LineTraceSingleByChannel(OutHit, Start, End, ECC_Visibility, QueryParams);
-
-	// return either the impact point or the trace end
-	return OutHit.bBlockingHit ? OutHit.ImpactPoint : OutHit.TraceEnd;
-}
-
-void AShooterCharacter::AddWeaponClass(const TSubclassOf<AShooterWeapon>& WeaponClass)
-{
-	// do we already own this weapon?
-	AShooterWeapon* OwnedWeapon = FindWeaponOfType(WeaponClass);
-
-	if (!OwnedWeapon)
-	{
-		// spawn the new weapon
-		FActorSpawnParameters SpawnParams;
-		SpawnParams.Owner = this;
-		SpawnParams.Instigator = this;
-		SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-		SpawnParams.TransformScaleMethod = ESpawnActorScaleMethod::MultiplyWithRoot;
-
-		AShooterWeapon* AddedWeapon = GetWorld()->SpawnActor<AShooterWeapon>(WeaponClass, GetActorTransform(), SpawnParams);
-
-		if (AddedWeapon)
+		int32 Head = 0;
+		while (Head < Queue.Num())
 		{
-			// add the weapon to the owned list
-			OwnedWeapons.Add(AddedWeapon);
+			const int32 Curr = Queue[Head++];
+			const int32 X = Curr % GridSize;
+			const int32 Y = Curr / GridSize;
+			const float W = InputActivations[Curr];
 
-			// if we have an existing weapon, deactivate it
-			if (CurrentWeapon)
+			ClusterWeight += W;
+			SumX += ((X + 0.5f) / static_cast<float>(GridSize)) * W;
+			SumY += ((Y + 0.5f) / static_cast<float>(GridSize)) * W;
+
+			const int32 DX[4] = { 1, -1, 0, 0 };
+			const int32 DY[4] = { 0, 0, 1, -1 };
+
+			for (int32 Dir = 0; Dir < 4; ++Dir)
 			{
-				CurrentWeapon->DeactivateWeapon();
+				const int32 NX = X + DX[Dir];
+				const int32 NY = Y + DY[Dir];
+
+				if (NX >= 0 && NX < GridSize && NY >= 0 && NY < GridSize)
+				{
+					const int32 NIdx = NY * GridSize + NX;
+					if (!Visited[NIdx] && InputActivations[NIdx] >= RedThreshold)
+					{
+						Visited[NIdx] = true;
+						Queue.Add(NIdx);
+					}
+				}
 			}
-
-			// switch to the new weapon
-			CurrentWeapon = AddedWeapon;
-			CurrentWeapon->ActivateWeapon(PlayerTag);
 		}
-	}
-}
 
-void AShooterCharacter::OnWeaponActivated(AShooterWeapon* Weapon)
-{
-	// update the bullet counter
-	OnBulletCountUpdated.Broadcast(Weapon->GetMagazineSize(), Weapon->GetBulletCount());
-
-	// set the character mesh AnimInstances
-	GetFirstPersonMesh()->SetAnimInstanceClass(Weapon->GetFirstPersonAnimInstanceClass());
-	GetMesh()->SetAnimInstanceClass(Weapon->GetThirdPersonAnimInstanceClass());
-}
-
-void AShooterCharacter::OnWeaponDeactivated(AShooterWeapon* Weapon)
-{
-	// unused
-}
-
-void AShooterCharacter::OnSemiWeaponRefire()
-{
-	// unused
-}
-
-AShooterWeapon* AShooterCharacter::FindWeaponOfType(TSubclassOf<AShooterWeapon> WeaponClass) const
-{
-	// check each owned weapon
-	for (AShooterWeapon* Weapon : OwnedWeapons)
-	{
-		if (Weapon->IsA(WeaponClass))
+		if (ClusterWeight > BestClusterWeight)
 		{
-			return Weapon;
+			BestClusterWeight = ClusterWeight;
+			BestCentroidX = SumX / ClusterWeight;
+			BestCentroidY = SumY / ClusterWeight;
 		}
 	}
 
-	// weapon not found
-	return nullptr;
-
-}
-
-void AShooterCharacter::Die()
-{
-	// deactivate the weapon
-	if (IsValid(CurrentWeapon))
+	if (BestClusterWeight <= 0.0f)
 	{
-		CurrentWeapon->DeactivateWeapon();
+		UE_LOG(LogTemp, Warning, TEXT("[MLP] Aucun rouge detecte (MaxAct=%.3f, Seuil=%.2f, Pixel=(R:%d G:%d B:%d))."),
+			MaxRedActivation, RedThreshold, SamplePixel.R, SamplePixel.G, SamplePixel.B);
+		return false;
 	}
 
-	// increment the team score
-	if (AShooterGameMode* GM = Cast<AShooterGameMode>(GetWorld()->GetAuthGameMode()))
+
+	OutExpectedX = BestCentroidX;
+	OutExpectedY = BestCentroidY;
+	return true;
+}
+
+void UMLPComponent::RunAIStep()
+{
+	APawn* OwnerPawn = Cast<APawn>(GetOwner());
+	if (!OwnerPawn) return;
+
+	APlayerController* PC = Cast<APlayerController>(OwnerPawn->GetController());
+	if (!PC) return;
+
+	// 1. Lire l'image 32x32 et trouver le rouge dans le FOV
+	float ExpectedX = 0.5f;
+	float ExpectedY = 0.5f;
+	if (!ExtractRedInputsAndTarget(ExpectedX, ExpectedY))
 	{
-		GM->IncrementTeamScore(TeamByte);
+		// Si l'entraînement est sorti trop loin dans un coin, on recentre dans une zone sûre
+		if (bHasTrainingAnchor)
+		{
+			const float SafeYaw = FMath::FRandRange(-25.0f, 25.0f);
+			const float SafePitch = FMath::FRandRange(-15.0f, 15.0f);
+			PC->SetControlRotation(TrainingAnchorRotation + FRotator(SafePitch, SafeYaw, 0.0f));
+		}
+		return;
 	}
 
-	// grant the death tag to the character
-	Tags.Add(DeathTag);
+	// 2. Prédiction du réseau de neurones (Forward Pass)
+	ForwardPass();
+	const float PredictedX = OutputActivations[0];
+	const float PredictedY = OutputActivations[1];
 
-	// stop character movement
-	GetCharacterMovement()->StopMovementImmediately();
-	GetCharacterMovement()->DisableMovement();
+	// 3. Conversion projective exacte (Atan) pour viser juste même tout au bord du FOV
+	const float HalfFOVRad = FMath::DegreesToRadians(CameraFOV * 0.5f);
+	const float TanHalfFOV = FMath::Tan(HalfFOVRad);
 
-	// disable collision
-	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	const float DeltaYaw = FMath::RadiansToDegrees(FMath::Atan((PredictedX - 0.5f) * 2.0f * TanHalfFOV));
+	const float DeltaPitch = FMath::RadiansToDegrees(FMath::Atan((0.5f - PredictedY) * 2.0f * TanHalfFOV));
 
-	// disable controls
-	DisableInput(nullptr);
+	FRotator CurrentRot = PC->GetControlRotation();
+	FRotator TargetRot = CurrentRot + FRotator(DeltaPitch, DeltaYaw, 0.0f);
+	PC->SetControlRotation(TargetRot);
 
-	// reset the bullet counter UI
-	OnBulletCountUpdated.Broadcast(0, 0);
+	// 4. Line Trace et déclenchement de l'arme via Delegate (uniquement hors entraînement)
+	FVector CamLoc;
+	FRotator CamRot;
+	PC->GetPlayerViewPoint(CamLoc, CamRot);
 
-	// call the BP handler
-	BP_OnDeath();
+	const FVector AimDir = TargetRot.Vector();
+	const FVector TraceEnd = CamLoc + (AimDir * TraceDistance);
 
-	// schedule character respawn
-	GetWorld()->GetTimerManager().SetTimer(RespawnTimer, this, &AShooterCharacter::OnRespawn, RespawnTime, false);
+	FHitResult HitResult;
+	FCollisionQueryParams QueryParams;
+	QueryParams.AddIgnoredActor(OwnerPawn);
+
+	const bool bHit = GetWorld()->LineTraceSingleByChannel(HitResult, CamLoc, TraceEnd, ECC_Visibility, QueryParams);
+	const bool bHitEnemy = bHit && HitResult.GetActor() && HitResult.GetActor()->ActorHasTag(FName("Enemy"));
+
+	TotalShots++;
+	if (bHitEnemy)
+	{
+		SuccessfulHits++;
+		if (OnHit.IsBound() && bHasWeapon && !bHasTrainingAnchor)
+		{
+			OnHit.Broadcast();
+		}
+	}
+
+	const FVector DebugStart = CamLoc - FVector(0.0f, 0.0f, 10.0f);
+	DrawDebugLine(GetWorld(), DebugStart, bHit ? HitResult.ImpactPoint : TraceEnd,
+		bHitEnemy ? FColor::Green : FColor::Blue, false, bHasTrainingAnchor ? 0.05f : 0.6f, 0, 0.8f);
+
+	// 5. Calcul du coût et apprentissage uniquement en mode Entraînement (T)
+	const float Cost = FMath::Square(ExpectedX - PredictedX) + FMath::Square(ExpectedY - PredictedY);
+	if (bHasTrainingAnchor && bTrainOnStep)
+	{
+		Backpropagate(ExpectedX, ExpectedY);
+	}
+
+	const float Accuracy = (static_cast<float>(SuccessfulHits) / static_cast<float>(TotalShots)) * 100.0f;
+	UE_LOG(LogTemp, Log, TEXT("[%s] Tir %d | Resultat: %s | Cost: %.4f | Precision: %.1f%%"),
+		bHasTrainingAnchor ? TEXT("MLP TRAIN") : TEXT("MLP TEST"),
+		TotalShots, bHitEnemy ? TEXT("TOUCHE") : TEXT("RATE  "), Cost, Accuracy);
+
+	// 6. Balayer tout le champ de vision (bords inclus) pendant l'entraînement
+	if (bHasTrainingAnchor)
+	{
+		const float RandomYaw = FMath::FRandRange(-38.0f, 38.0f);
+		const float RandomPitch = FMath::FRandRange(-25.0f, 25.0f);
+		PC->SetControlRotation(TrainingAnchorRotation + FRotator(RandomPitch, RandomYaw, 0.0f));
+	}
 }
 
-void AShooterCharacter::OnRespawn()
+void UMLPComponent::ToggleAutoTraining()
 {
-	// destroy the character to force the PC to respawn
-	Destroy();
-}
+	if (!GetWorld()) return;
 
-bool AShooterCharacter::IsDead() const
-{
-	// the character is dead if their current HP drops to zero
-	return CurrentHP <= 0.0f;
-}
+	if (GetWorld()->GetTimerManager().IsTimerActive(AutoTrainTimerHandle))
+	{
+		GetWorld()->GetTimerManager().ClearTimer(AutoTrainTimerHandle);
+		bHasTrainingAnchor = false;
+		UE_LOG(LogTemp, Log, TEXT("[MLP] Entrainement automatique ARRETE."));
+	}
+	else
+	{
+		if (APawn* OwnerPawn = Cast<APawn>(GetOwner()))
+		{
+			if (APlayerController* PC = Cast<APlayerController>(OwnerPawn->GetController()))
+			{
+				TrainingAnchorRotation = PC->GetControlRotation();
+				bHasTrainingAnchor = true;
+			}
+		}
 
-void AShooterCharacter::SetTeam(uint8 Team)
-{
-	TeamByte = Team;
+		GetWorld()->GetTimerManager().SetTimer(AutoTrainTimerHandle, this, &UMLPComponent::RunAIStep, 0.03f, true);
+		UE_LOG(LogTemp, Log, TEXT("[MLP] Entrainement automatique DEMARRE."));
+	}
 }

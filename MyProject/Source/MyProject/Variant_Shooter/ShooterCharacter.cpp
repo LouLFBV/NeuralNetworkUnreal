@@ -18,6 +18,8 @@
 #include "Engine/TextureRenderTarget2D.h"
 #include "MLPComponent.h"
 
+
+
 AShooterCharacter::AShooterCharacter()
 {
 	// create the noise emitter component
@@ -77,14 +79,35 @@ void AShooterCharacter::BeginPlay()
 
 		MLPComponent->VisionRenderTarget = VisionRenderTarget;
 		MLPComponent->CameraFOV = VisionCaptureComponent->FOVAngle;
+
+		MLPComponent->OnHit.AddDynamic(this, &AShooterCharacter::HandleAIHit);
 	}
 }
 void AShooterCharacter::EndPlay(EEndPlayReason::Type EndPlayReason)
 {
+	if (MLPComponent)
+	{
+		MLPComponent->OnHit.RemoveDynamic(this, &AShooterCharacter::HandleAIHit);
+	}
 	Super::EndPlay(EndPlayReason);
 
 	// clear the respawn timer
 	GetWorld()->GetTimerManager().ClearTimer(RespawnTimer);
+}
+
+void AShooterCharacter::HandleAIHit()
+{
+	DoStartFiring();
+	if (GetWorld())
+	{
+		GetWorld()->GetTimerManager().SetTimer(
+			AITimerHandle,
+			this,
+			&AShooterCharacter::DoStopFiring,
+			0.05f,
+			false
+			);
+	}
 }
 
 void AShooterCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -312,11 +335,20 @@ void AShooterCharacter::OnWeaponActivated(AShooterWeapon* Weapon)
 	// set the character mesh AnimInstances
 	GetFirstPersonMesh()->SetAnimInstanceClass(Weapon->GetFirstPersonAnimInstanceClass());
 	GetMesh()->SetAnimInstanceClass(Weapon->GetThirdPersonAnimInstanceClass());
+
+	if (MLPComponent)
+	{
+		MLPComponent->SetHasWeapon(true);
+	}
 }
 
 void AShooterCharacter::OnWeaponDeactivated(AShooterWeapon* Weapon)
 {
 	// unused
+	if (MLPComponent)
+	{
+		MLPComponent->SetHasWeapon(false);
+	}
 }
 
 void AShooterCharacter::OnSemiWeaponRefire()
@@ -375,6 +407,13 @@ void AShooterCharacter::Die()
 
 	// schedule character respawn
 	GetWorld()->GetTimerManager().SetTimer(RespawnTimer, this, &AShooterCharacter::OnRespawn, RespawnTime, false);
+
+	if (MLPComponent)
+	{
+		MLPComponent->SetHasWeapon(false);
+	}
+
+	GetWorld()->GetTimerManager().ClearTimer(AITimerHandle);
 }
 
 void AShooterCharacter::OnRespawn()
