@@ -141,10 +141,12 @@ float AShooterCharacter::TakeDamage(float Damage, struct FDamageEvent const& Dam
 void AShooterCharacter::DoAim(float Yaw, float Pitch)
 {
 	// only route inputs if the character is not dead
-	if (!IsDead())
+	if (IsDead())
 	{
-		Super::DoAim(Yaw, Pitch);
+		return;
 	}
+
+	Super::DoAim(Yaw, Pitch);
 }
 
 void AShooterCharacter::DoMove(float Right, float Forward)

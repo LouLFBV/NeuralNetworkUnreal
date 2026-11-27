@@ -8,18 +8,18 @@
 
 class UTextureRenderTarget2D;
 
-UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
+UCLASS(ClassGroup = (Custom), meta = (BlueprintSpawnableComponent))
 class MYPROJECT_API UMLPComponent : public UActorComponent
 {
 	GENERATED_BODY()
 
-public:	
+public:
 	UMLPComponent();
 
 protected:
 	virtual void BeginPlay() override;
 
-public:	
+public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MLP|Architecture")
 	int32 HiddenNeuronCount = 32;
 
@@ -47,7 +47,7 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "MLP")
 	void ToggleAutoTraining();
 
-private :
+private:
 	static constexpr int32 GridSize = 32;
 	static constexpr int32 InputNeuronCount = GridSize * GridSize;
 	static constexpr int32 OutputNeuronCount = 2;
